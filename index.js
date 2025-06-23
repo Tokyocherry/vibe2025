@@ -36,7 +36,7 @@ const dbConfig = {
     }
   }
 
-// Stub function for generating HTML rows
+// Stub function for generating HTML rows.
 async function getHtmlRows() {
     // Example data - replace with actual DB data later
     /*
