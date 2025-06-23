@@ -38,21 +38,24 @@ const dbConfig = {
 
 // Stub function for generating HTML rows
 async function getHtmlRows() {
-    // Example data - replace with actual DB data later
-    /*
-    const todoItems = [
-        { id: 1, text: 'First todo item' },
-        { id: 2, text: 'Second todo item' }
-    ];*/
-
     const todoItems = await retrieveListItems();
 
-    // Generate HTML for each item
-    return todoItems.map(item => `
+    return todoItems.map((item, index) => `
         <tr>
-            <td>${item.id}</td>
-            <td>${item.text}</td>
-            <td><button class="delete-btn">×</button></td>
+            <td>${index + 1}</td>
+            <td>
+                <form method="POST" action="/edit" style="display: flex; gap: 5px;">
+                    <input type="hidden" name="id" value="${item.id}">
+                    <input type="text" name="text" value="${item.text}" style="flex: 1;">
+                    <button type="submit">Save</button>
+                </form>
+            </td>
+            <td>
+                <form method="POST" action="/delete" onsubmit="return confirm('Delete this item?');">
+                    <input type="hidden" name="id" value="${item.id}">
+                    <button type="submit">Delete</button>
+                </form>
+            </td>
         </tr>
     `).join('');
 }
@@ -127,11 +130,71 @@ async function handleRequest(req, res) {
                 res.end('Invalid item text');
             }
         });
-    } else {
+    } else if (req.method === 'POST' && req.url === '/delete') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            const parsed = new URLSearchParams(body);
+            const id = parseInt(parsed.get('id'), 10);
+
+            if (!isNaN(id)) {
+                try {
+                    await deleteItemFromDatabase(id);
+                    res.writeHead(302, { Location: '/' });
+                    res.end();
+                } catch (err) {
+                    console.error(err);
+                    res.writeHead(500, { 'Content-Type': 'text/plain' });
+                    res.end('Error deleting item');
+                }
+            } else {
+                res.writeHead(400, { 'Content-Type': 'text/plain' });
+                res.end('Invalid ID');
+            }
+        });
+    } else if (req.method === 'POST' && req.url === '/edit') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+                const parsed = new URLSearchParams(body);
+                const id = parseInt(parsed.get('id'), 10);
+                const text = parsed.get('text')?.trim();
+
+                if (!isNaN(id) && text) {
+                    try {
+                        await updateItemInDatabase(id, text);
+                        res.writeHead(302, { Location: '/' });
+                        res.end();
+                    } catch (err) {
+                        console.error(err);
+                        res.writeHead(500, { 'Content-Type': 'text/plain' });
+                        res.end('Error updating item');
+                    }
+                } else {
+                    res.writeHead(400, { 'Content-Type': 'text/plain' });
+                    res.end('Invalid data');
+                }
+            });
+        }
+    else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Route not found');
     }
 }
+
+async function updateItemInDatabase(id, text) {
+    const connection = await mysql.createConnection(dbConfig);
+    await connection.execute('UPDATE items SET text = ? WHERE id = ?', [text, id]);
+    await connection.end();
+}
+
+async function deleteItemFromDatabase(id) {
+    const connection = await mysql.createConnection(dbConfig);
+    const query = 'DELETE FROM items WHERE id = ?';
+    await connection.execute(query, [id]);
+    await connection.end();
+}
+
 
 // Create and start server
 const server = http.createServer(handleRequest);
