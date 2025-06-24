@@ -28,7 +28,7 @@ const dbConfig = {
       // Close the connection
       await connection.end();
       
-      // Return the retrieved items as a JSON array
+      // Return the retrieved items as a JSON array.
       return rows;
     } catch (error) {
       console.error('Error retrieving list items:', error);
